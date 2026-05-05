@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.models import ValidateRequest, ValidateResponse
+from app.schemas.query import ValidateRequest, ValidateResponse
 
 router = APIRouter()
 

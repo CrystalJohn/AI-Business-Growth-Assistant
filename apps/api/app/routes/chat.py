@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.models import QueryRequest, QueryResponse
+from app.schemas.query import QueryRequest, QueryResponse
 from app.services.mock_llm import get_mock_response
 
 router = APIRouter()

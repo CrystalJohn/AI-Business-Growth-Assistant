@@ -1,15 +1,29 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from app.config import settings
+from app.db.session import async_engine
 from app.routes import health, schema_route, chat, sql_route
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with async_engine.connect() as conn:
+        await conn.execute(text("SELECT 1"))
+    yield
+    await async_engine.dispose()
+
+
 app = FastAPI(
-    title="AI Business Growth Assistant API",
-    description="ChatBI API — natural language → SQL + results",
-    version="0.1.0",
+    title="HR ChatBI API",
+    description="HR ChatBI — natural language → SQL + results with PII masking",
+    version="0.2.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

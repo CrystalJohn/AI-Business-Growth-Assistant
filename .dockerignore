@@ -1,0 +1,8 @@
+.git/
+.vscode/
+.windsurf/
+docs/
+*.md
+apps/*/node_modules/
+apps/*/.venv/
+apps/*/.next/

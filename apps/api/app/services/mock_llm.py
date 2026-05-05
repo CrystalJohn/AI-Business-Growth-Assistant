@@ -5,300 +5,305 @@ Returns realistic pre-canned responses based on keyword matching.
 Replace this module with a real LLM provider when ready.
 """
 
-from app.models import QueryResponse, TableColumn
+from app.schemas.query import QueryResponse, TableColumn
 
 # ---------------------------------------------------------------------------
-# Response catalogue
+# HR Response catalogue — 6 use cases mapped from docs/erd.md section 5
 # ---------------------------------------------------------------------------
 
 _RESPONSES: list[dict] = [
     {
-        "keywords": ["top", "product", "revenue", "best", "selling"],
+        "keywords": ["headcount", "nhân viên", "phòng ban", "department", "bao nhiêu người", "số lượng"],
         "answer": (
-            "The top 5 products by total revenue are led by **White-label License** "
-            "and **Analytics Enterprise**, which together account for over 60% of total "
-            "product revenue. Software subscriptions dominate the mix."
+            "Tổng headcount hiện tại là **150 nhân viên** phân bố trên 4 phòng ban. "
+            "**Kỹ thuật** dẫn đầu với 42 người, tiếp theo là **Kinh doanh** (38), "
+            "**Marketing** (37) và **Nhân sự** (33). Tỉ lệ nam/nữ tổng thể là 60/40."
         ),
         "sql": """\
 SELECT
-  p.name                          AS product,
-  p.category,
-  SUM(oi.total_price)             AS total_revenue,
-  COUNT(DISTINCT oi.order_id)     AS orders_count
-FROM order_items  oi
-JOIN products     p  ON p.id = oi.product_id
-GROUP BY p.id, p.name, p.category
-ORDER BY total_revenue DESC
-LIMIT 5;""",
+  d.name                  AS phong_ban,
+  COUNT(e.id)             AS so_nhan_vien,
+  SUM(CASE WHEN e.gender = 'M' THEN 1 ELSE 0 END) AS nam,
+  SUM(CASE WHEN e.gender = 'F' THEN 1 ELSE 0 END) AS nu
+FROM employees e
+JOIN departments d ON d.id = e.department_id
+WHERE e.deleted_at IS NULL
+  AND e.status = 'active'
+GROUP BY d.name
+ORDER BY so_nhan_vien DESC;""",
         "columns": [
-            {"key": "product", "label": "Product", "type": "string"},
-            {"key": "category", "label": "Category", "type": "string"},
-            {"key": "total_revenue", "label": "Revenue ($)", "type": "number"},
-            {"key": "orders_count", "label": "Orders", "type": "number"},
+            {"key": "phong_ban",      "label": "Phòng ban",   "type": "string"},
+            {"key": "so_nhan_vien",   "label": "Tổng",        "type": "number"},
+            {"key": "nam",            "label": "Nam",         "type": "number"},
+            {"key": "nu",             "label": "Nữ",          "type": "number"},
         ],
         "rows": [
-            {"product": "White-label License",   "category": "License",  "total_revenue": 74975.00, "orders_count": 25},
-            {"product": "Analytics Enterprise",  "category": "Software", "total_revenue": 52947.00, "orders_count": 53},
-            {"product": "Setup & Onboarding",    "category": "Services", "total_revenue": 31500.00, "orders_count": 21},
-            {"product": "Analytics Pro",         "category": "Software", "total_revenue": 23022.00, "orders_count": 77},
-            {"product": "AI Insights Module",    "category": "Add-on",   "total_revenue": 10547.00, "orders_count": 53},
+            {"phong_ban": "Kỹ thuật",   "so_nhan_vien": 42, "nam": 28, "nu": 14},
+            {"phong_ban": "Kinh doanh", "so_nhan_vien": 38, "nam": 24, "nu": 14},
+            {"phong_ban": "Marketing",  "so_nhan_vien": 37, "nam": 20, "nu": 17},
+            {"phong_ban": "Nhân sự",    "so_nhan_vien": 33, "nam": 16, "nu": 17},
         ],
         "chartType": "bar",
         "followUpQuestions": [
-            "Which customer segment buys the most White-label Licenses?",
-            "What is the profit margin per product category?",
-            "How has product revenue trended month over month?",
+            "Tỉ lệ nam/nữ theo từng phòng ban?",
+            "Headcount thay đổi như thế nào trong 12 tháng qua?",
+            "Phòng ban nào có tỉ lệ nghỉ việc cao nhất?",
         ],
     },
     {
-        "keywords": ["monthly", "revenue", "trend", "month", "over"],
+        "keywords": ["sinh nhật", "birthday", "tháng này", "tháng", "kỷ niệm"],
         "answer": (
-            "Monthly revenue has grown steadily throughout 2024, starting at **$31,195** "
-            "in January and peaking at **$49,730** in December — a **59% increase** over "
-            "the year. Q4 showed the strongest growth, driven by the Fall Product Launch campaign."
+            "Tháng này có **8 nhân viên** có sinh nhật. "
+            "Gửi lời chúc sớm để tạo gắn kết nhé! "
+            "Danh sách được sắp theo ngày sinh nhật tăng dần."
         ),
         "sql": """\
 SELECT
-  TO_CHAR(order_date, 'YYYY-MM')  AS month,
-  SUM(total_amount)               AS revenue,
-  COUNT(*)                        AS order_count
-FROM orders
-WHERE order_date >= '2024-01-01'
-GROUP BY 1
-ORDER BY 1;""",
+  full_name,
+  TO_CHAR(birth_date, 'DD/MM')   AS ngay_sinh_nhat,
+  job_title,
+  d.name                          AS phong_ban
+FROM employees e
+JOIN departments d ON d.id = e.department_id
+WHERE EXTRACT(MONTH FROM birth_date) = EXTRACT(MONTH FROM CURRENT_DATE)
+  AND e.deleted_at IS NULL
+  AND e.status = 'active'
+ORDER BY EXTRACT(DAY FROM birth_date);""",
         "columns": [
-            {"key": "month",       "label": "Month",       "type": "string"},
-            {"key": "revenue",     "label": "Revenue ($)", "type": "number"},
-            {"key": "order_count", "label": "Orders",      "type": "number"},
+            {"key": "full_name",       "label": "Họ và tên",     "type": "string"},
+            {"key": "ngay_sinh_nhat",  "label": "Ngày sinh",     "type": "string"},
+            {"key": "job_title",       "label": "Chức danh",     "type": "string"},
+            {"key": "phong_ban",       "label": "Phòng ban",     "type": "string"},
         ],
         "rows": [
-            {"month": "2024-01", "revenue": 31195.00, "order_count":  8},
-            {"month": "2024-02", "revenue": 28568.00, "order_count":  8},
-            {"month": "2024-03", "revenue": 33496.00, "order_count":  8},
-            {"month": "2024-04", "revenue": 30316.00, "order_count":  8},
-            {"month": "2024-05", "revenue": 35016.00, "order_count":  8},
-            {"month": "2024-06", "revenue": 36988.00, "order_count":  8},
-            {"month": "2024-07", "revenue": 38073.00, "order_count":  8},
-            {"month": "2024-08", "revenue": 36464.00, "order_count":  8},
-            {"month": "2024-09", "revenue": 40586.00, "order_count":  8},
-            {"month": "2024-10", "revenue": 43863.00, "order_count":  8},
-            {"month": "2024-11", "revenue": 45984.00, "order_count":  8},
-            {"month": "2024-12", "revenue": 49730.00, "order_count":  8},
+            {"full_name": "Nguyễn Thị Lan",   "ngay_sinh_nhat": "03/05", "job_title": "Chuyên viên marketing",    "phong_ban": "Marketing"},
+            {"full_name": "Trần Văn Minh",     "ngay_sinh_nhat": "07/05", "job_title": "Lập trình viên Backend",   "phong_ban": "Kỹ thuật"},
+            {"full_name": "Lê Thị Hương",      "ngay_sinh_nhat": "10/05", "job_title": "Chuyên viên tuyển dụng",  "phong_ban": "Nhân sự"},
+            {"full_name": "Phạm Quốc Bảo",     "ngay_sinh_nhat": "14/05", "job_title": "Chuyên viên kinh doanh",  "phong_ban": "Kinh doanh"},
+            {"full_name": "Hoàng Thị Mai",     "ngay_sinh_nhat": "18/05", "job_title": "Chuyên viên nội dung",    "phong_ban": "Marketing"},
+            {"full_name": "Đặng Văn Hùng",     "ngay_sinh_nhat": "21/05", "job_title": "Kỹ sư DevOps",            "phong_ban": "Kỹ thuật"},
+            {"full_name": "Vũ Thị Thu",        "ngay_sinh_nhat": "25/05", "job_title": "Chuyên viên C&B",         "phong_ban": "Nhân sự"},
+            {"full_name": "Bùi Đức Thắng",     "ngay_sinh_nhat": "29/05", "job_title": "Quản lý tài khoản",       "phong_ban": "Kinh doanh"},
         ],
-        "chartType": "line",
+        "chartType": None,
         "followUpQuestions": [
-            "Which months had the highest average order value?",
-            "What drove the revenue spike in Q4?",
-            "Break down monthly revenue by customer segment.",
+            "Sinh nhật tháng sau có những ai?",
+            "Nhân viên nào sắp kỷ niệm ngày vào làm?",
         ],
     },
     {
-        "keywords": ["segment", "customer", "value", "ltv", "lifetime"],
+        "keywords": ["lương", "salary", "level", "mức lương", "thu nhập", "lương trung bình"],
         "answer": (
-            "**Partner** customers have the highest average lifetime value at **$20,783**, "
-            "followed by Enterprise at **$27,350** (highest total). Individual customers "
-            "have the lowest LTV at ~**$1,013** but represent the largest segment by count."
+            "Lương trung bình toàn công ty là **28.4 triệu VND/tháng**. "
+            "Manager có mức cao nhất (**57.2M**), Junior thấp nhất (**11.3M**). "
+            "Phòng Kỹ thuật có lương trung bình cao nhất trong 4 phòng ban."
         ),
         "sql": """\
 SELECT
-  cs.name                        AS segment,
-  COUNT(c.id)                    AS customer_count,
-  ROUND(AVG(c.lifetime_value), 2) AS avg_ltv,
-  SUM(c.lifetime_value)          AS total_ltv
-FROM customers        c
-JOIN customer_segments cs ON cs.id = c.segment_id
-GROUP BY cs.name
-ORDER BY avg_ltv DESC;""",
+  p.level,
+  COUNT(*)                              AS so_nhan_vien,
+  ROUND(AVG(p.base_salary) / 1000000, 1) AS luong_tb_trieu,
+  ROUND(MIN(p.base_salary) / 1000000, 1) AS luong_min_trieu,
+  ROUND(MAX(p.base_salary) / 1000000, 1) AS luong_max_trieu
+FROM payroll p
+JOIN employees e ON e.id = p.employee_id
+WHERE p.deleted_at IS NULL
+  AND e.deleted_at IS NULL
+GROUP BY p.level
+ORDER BY luong_tb_trieu DESC;""",
         "columns": [
-            {"key": "segment",        "label": "Segment",         "type": "string"},
-            {"key": "customer_count", "label": "Customers",       "type": "number"},
-            {"key": "avg_ltv",        "label": "Avg LTV ($)",     "type": "number"},
-            {"key": "total_ltv",      "label": "Total LTV ($)",   "type": "number"},
+            {"key": "level",           "label": "Level",        "type": "string"},
+            {"key": "so_nhan_vien",    "label": "Số NV",        "type": "number"},
+            {"key": "luong_tb_trieu",  "label": "TB (triệu)",   "type": "number"},
+            {"key": "luong_min_trieu", "label": "Min (triệu)",  "type": "number"},
+            {"key": "luong_max_trieu", "label": "Max (triệu)",  "type": "number"},
         ],
         "rows": [
-            {"segment": "Partner",    "customer_count": 6, "avg_ltv": 20783.33, "total_ltv": 124700.00},
-            {"segment": "Enterprise", "customer_count": 6, "avg_ltv": 27350.00, "total_ltv": 164100.00},
-            {"segment": "SMB",        "customer_count": 6, "avg_ltv":  9266.67, "total_ltv":  55600.00},
-            {"segment": "Startup",    "customer_count": 6, "avg_ltv":  3016.67, "total_ltv":  18100.00},
-            {"segment": "Individual", "customer_count": 6, "avg_ltv":  1013.33, "total_ltv":   6080.00},
+            {"level": "Manager", "so_nhan_vien": 15, "luong_tb_trieu": 57.2, "luong_min_trieu": 40.5, "luong_max_trieu": 79.0},
+            {"level": "Lead",    "so_nhan_vien": 22, "luong_tb_trieu": 38.6, "luong_min_trieu": 30.0, "luong_max_trieu": 49.5},
+            {"level": "Senior",  "so_nhan_vien": 53, "luong_tb_trieu": 21.4, "luong_min_trieu": 15.0, "luong_max_trieu": 29.5},
+            {"level": "Junior",  "so_nhan_vien": 60, "luong_tb_trieu": 11.3, "luong_min_trieu":  8.0, "luong_max_trieu": 14.5},
         ],
         "chartType": "bar",
         "followUpQuestions": [
-            "What products do Enterprise customers buy most?",
-            "How many customers churned in each segment this year?",
-            "What is the revenue contribution of each segment?",
+            "Lương trung bình theo phòng ban?",
+            "Bao nhiêu nhân viên đang ở mức lương trên 30 triệu?",
+            "So sánh lương nam và nữ cùng level?",
         ],
     },
     {
-        "keywords": ["campaign", "performance", "conversion", "roi", "best"],
+        "keywords": ["nghỉ phép", "leave", "phép", "nghỉ", "đơn nghỉ", "xin nghỉ"],
         "answer": (
-            "The **Fall Product Launch** campaign had the highest conversions (340) with a "
-            "strong ROI. **Partner Referral Q3** achieved the best conversion rate at **15.8%** "
-            "with the lowest cost per conversion. Google Ads campaigns drove the most volume."
+            "Hiện có **23 đơn nghỉ phép đang chờ duyệt**. "
+            "Loại nghỉ phổ biến nhất là **Nghỉ phép năm** (14 đơn). "
+            "Phòng Kỹ thuật có nhiều đơn pending nhất (8 đơn)."
         ),
         "sql": """\
 SELECT
-  name,
-  channel,
-  budget,
-  spent,
-  conversions,
-  ROUND(conversions::numeric / NULLIF(clicks, 0) * 100, 2) AS conversion_rate_pct,
-  ROUND(spent / NULLIF(conversions, 0), 2)                  AS cost_per_conversion
-FROM campaigns
-ORDER BY conversions DESC;""",
+  lr.leave_type,
+  lr.status,
+  COUNT(*)          AS so_don,
+  e.full_name,
+  d.name            AS phong_ban,
+  lr.start_date,
+  lr.end_date
+FROM leave_requests lr
+JOIN employees e    ON e.id = lr.employee_id
+JOIN departments d  ON d.id = e.department_id
+WHERE lr.status = 'pending'
+  AND lr.deleted_at IS NULL
+ORDER BY lr.created_at DESC
+LIMIT 10;""",
         "columns": [
-            {"key": "name",                 "label": "Campaign",          "type": "string"},
-            {"key": "channel",              "label": "Channel",           "type": "string"},
-            {"key": "conversions",          "label": "Conversions",       "type": "number"},
-            {"key": "conversion_rate_pct",  "label": "Conv. Rate (%)",    "type": "number"},
-            {"key": "cost_per_conversion",  "label": "Cost/Conv. ($)",    "type": "number"},
+            {"key": "full_name",   "label": "Nhân viên",    "type": "string"},
+            {"key": "phong_ban",   "label": "Phòng ban",    "type": "string"},
+            {"key": "leave_type",  "label": "Loại nghỉ",   "type": "string"},
+            {"key": "start_date",  "label": "Từ ngày",     "type": "string"},
+            {"key": "end_date",    "label": "Đến ngày",    "type": "string"},
         ],
         "rows": [
-            {"name": "Fall Product Launch",   "channel": "Multi-channel", "conversions": 340, "conversion_rate_pct": 1.89, "cost_per_conversion":  64.71},
-            {"name": "Q3 Google Ads",         "channel": "Google Ads",    "conversions": 265, "conversion_rate_pct": 2.60, "cost_per_conversion":  65.66},
-            {"name": "Q1 Google Ads",         "channel": "Google Ads",    "conversions": 210, "conversion_rate_pct": 2.50, "cost_per_conversion":  67.62},
-            {"name": "Q4 Year-End Push",      "channel": "Email",         "conversions": 210, "conversion_rate_pct": 1.48, "cost_per_conversion":  17.14},
-            {"name": "Summer Social Ads",     "channel": "Facebook",      "conversions": 198, "conversion_rate_pct": 1.65, "cost_per_conversion":  47.98},
-            {"name": "Webinar Series Q2",     "channel": "Webinar",       "conversions": 120, "conversion_rate_pct": 8.57, "cost_per_conversion":  26.67},
-            {"name": "Partner Referral Q3",   "channel": "Referral",      "conversions":  95, "conversion_rate_pct":15.83, "cost_per_conversion":   8.42},
-            {"name": "Spring Email Blast",    "channel": "Email",         "conversions": 145, "conversion_rate_pct": 1.48, "cost_per_conversion":  12.41},
-            {"name": "Q1 LinkedIn Outreach",  "channel": "LinkedIn",      "conversions":  88, "conversion_rate_pct": 2.75, "cost_per_conversion":  86.36},
-            {"name": "Q2 Content Marketing",  "channel": "Content",       "conversions":  73, "conversion_rate_pct": 1.18, "cost_per_conversion":  67.12},
+            {"full_name": "Nguyễn Văn An",   "phong_ban": "Kỹ thuật",   "leave_type": "Nghỉ phép năm",  "start_date": "2026-05-05", "end_date": "2026-05-07"},
+            {"full_name": "Trần Thị Bích",   "phong_ban": "Marketing",  "leave_type": "Nghỉ ốm",        "start_date": "2026-05-06", "end_date": "2026-05-06"},
+            {"full_name": "Lê Quang Đức",    "phong_ban": "Kinh doanh", "leave_type": "Nghỉ phép năm",  "start_date": "2026-05-08", "end_date": "2026-05-10"},
+            {"full_name": "Phạm Thị Cúc",    "phong_ban": "Nhân sự",    "leave_type": "Nghỉ thai sản",  "start_date": "2026-05-10", "end_date": "2026-07-10"},
+            {"full_name": "Hoàng Văn Tân",   "phong_ban": "Kỹ thuật",   "leave_type": "Nghỉ phép năm",  "start_date": "2026-05-12", "end_date": "2026-05-14"},
         ],
         "chartType": "bar",
         "followUpQuestions": [
-            "Which campaign channel has the best overall ROI?",
-            "How many leads did each campaign generate?",
-            "What was the total marketing spend vs revenue generated?",
+            "Tổng số ngày phép đã dùng theo phòng ban?",
+            "Nhân viên nào còn nhiều phép nhất?",
+            "Tháng nào có nhiều đơn nghỉ nhất trong năm?",
         ],
     },
     {
-        "keywords": ["lead", "conversion", "source", "pipeline", "funnel"],
+        "keywords": ["đánh giá", "performance", "review", "điểm", "hiệu suất", "kết quả"],
         "answer": (
-            "The sales pipeline shows **60 leads** total. **Referral** leads have the highest "
-            "conversion rate at **60%**, while Google Ads drives the most volume. "
-            "Currently 14 leads are in qualified status, ready for follow-up."
+            "Kỳ đánh giá **2024-H2** vừa hoàn thành với điểm trung bình **3.72/5**. "
+            "**42%** nhân viên đạt xếp loại *Tốt* hoặc *Xuất sắc*. "
+            "Phòng Kỹ thuật có điểm trung bình cao nhất (3.91)."
         ),
         "sql": """\
 SELECT
-  source,
-  COUNT(*)                                                          AS total_leads,
-  SUM(CASE WHEN status = 'converted' THEN 1 ELSE 0 END)           AS converted,
-  SUM(CASE WHEN status = 'qualified' THEN 1 ELSE 0 END)           AS qualified,
-  SUM(CASE WHEN status = 'lost'      THEN 1 ELSE 0 END)           AS lost,
+  d.name                              AS phong_ban,
+  COUNT(pr.id)                        AS so_danh_gia,
+  ROUND(AVG(pr.score), 2)            AS diem_trung_binh,
+  SUM(CASE WHEN pr.rating IN ('Xuất sắc','Tốt') THEN 1 ELSE 0 END) AS dat_tot_tro_len,
   ROUND(
-    SUM(CASE WHEN status = 'converted' THEN 1 ELSE 0 END)::numeric
-    / COUNT(*) * 100, 1
-  )                                                                 AS conversion_rate_pct
-FROM leads
-GROUP BY source
-ORDER BY total_leads DESC;""",
+    SUM(CASE WHEN pr.rating IN ('Xuất sắc','Tốt') THEN 1 ELSE 0 END)::numeric
+    / COUNT(pr.id) * 100, 1
+  )                                   AS pct_tot_tro_len
+FROM performance_reviews pr
+JOIN employees e   ON e.id = pr.employee_id
+JOIN departments d ON d.id = e.department_id
+WHERE pr.period = '2024-H2'
+  AND pr.deleted_at IS NULL
+GROUP BY d.name
+ORDER BY diem_trung_binh DESC;""",
         "columns": [
-            {"key": "source",              "label": "Source",          "type": "string"},
-            {"key": "total_leads",         "label": "Total Leads",     "type": "number"},
-            {"key": "converted",           "label": "Converted",       "type": "number"},
-            {"key": "qualified",           "label": "Qualified",       "type": "number"},
-            {"key": "lost",                "label": "Lost",            "type": "number"},
-            {"key": "conversion_rate_pct", "label": "Conv. Rate (%)", "type": "number"},
+            {"key": "phong_ban",        "label": "Phòng ban",       "type": "string"},
+            {"key": "so_danh_gia",      "label": "Số đánh giá",     "type": "number"},
+            {"key": "diem_trung_binh",  "label": "Điểm TB",         "type": "number"},
+            {"key": "pct_tot_tro_len",  "label": "% Tốt+",          "type": "number"},
         ],
         "rows": [
-            {"source": "Google Ads", "total_leads": 16, "converted":  8, "qualified": 3, "lost": 4, "conversion_rate_pct": 50.0},
-            {"source": "Facebook",   "total_leads": 10, "converted":  4, "qualified": 3, "lost": 3, "conversion_rate_pct": 40.0},
-            {"source": "LinkedIn",   "total_leads": 10, "converted":  2, "qualified": 3, "lost": 3, "conversion_rate_pct": 20.0},
-            {"source": "Content",    "total_leads":  8, "converted":  3, "qualified": 1, "lost": 2, "conversion_rate_pct": 37.5},
-            {"source": "Referral",   "total_leads":  8, "converted":  5, "qualified": 2, "lost": 1, "conversion_rate_pct": 62.5},
-            {"source": "Email",      "total_leads":  6, "converted":  2, "qualified": 2, "lost": 0, "conversion_rate_pct": 33.3},
-            {"source": "Webinar",    "total_leads":  5, "converted":  2, "qualified": 1, "lost": 1, "conversion_rate_pct": 40.0},
+            {"phong_ban": "Kỹ thuật",   "so_danh_gia": 42, "diem_trung_binh": 3.91, "pct_tot_tro_len": 48.0},
+            {"phong_ban": "Kinh doanh", "so_danh_gia": 38, "diem_trung_binh": 3.74, "pct_tot_tro_len": 42.0},
+            {"phong_ban": "Marketing",  "so_danh_gia": 37, "diem_trung_binh": 3.68, "pct_tot_tro_len": 40.0},
+            {"phong_ban": "Nhân sự",    "so_danh_gia": 33, "diem_trung_binh": 3.55, "pct_tot_tro_len": 36.0},
         ],
         "chartType": "bar",
         "followUpQuestions": [
-            "What is the average lead score by source?",
-            "Which campaigns generated the most qualified leads?",
-            "How long does it take on average to convert a lead?",
+            "Ai có điểm đánh giá cao nhất kỳ 2024-H2?",
+            "So sánh điểm trung bình 2024-H1 vs 2024-H2?",
+            "Nhân viên nào cần cải thiện (điểm dưới 2.5)?",
         ],
     },
     {
-        "keywords": ["order", "average", "value", "aov", "basket"],
+        "keywords": ["thâm niên", "tenure", "lâu nhất", "lâu năm", "ngày vào làm", "kỷ niệm công tác"],
         "answer": (
-            "The average order value (AOV) across all completed orders is **$3,847**. "
-            "Partner-segment orders have the highest AOV at **$5,210**, while Individual "
-            "customers average **$487** per order."
+            "Top 5 nhân viên có thâm niên cao nhất đều trên **4 năm** công tác. "
+            "**Nguyễn Văn Thành** dẫn đầu với gần 5 năm. "
+            "Trung bình toàn công ty là **2.3 năm**."
         ),
         "sql": """\
 SELECT
-  cs.name                           AS segment,
-  COUNT(o.id)                       AS total_orders,
-  ROUND(AVG(o.total_amount), 2)     AS avg_order_value,
-  ROUND(SUM(o.total_amount), 2)     AS total_revenue
-FROM orders           o
-JOIN customers        c  ON c.id = o.customer_id
-JOIN customer_segments cs ON cs.id = c.segment_id
-WHERE o.status = 'completed'
-GROUP BY cs.name
-ORDER BY avg_order_value DESC;""",
+  e.full_name,
+  d.name                                                  AS phong_ban,
+  e.job_title,
+  e.join_date,
+  ROUND(
+    EXTRACT(EPOCH FROM (CURRENT_DATE - e.join_date)) / 86400 / 365, 1
+  )                                                       AS tham_nien_nam
+FROM employees e
+JOIN departments d ON d.id = e.department_id
+WHERE e.deleted_at IS NULL
+  AND e.status = 'active'
+ORDER BY e.join_date ASC
+LIMIT 10;""",
         "columns": [
-            {"key": "segment",         "label": "Segment",       "type": "string"},
-            {"key": "total_orders",    "label": "Orders",        "type": "number"},
-            {"key": "avg_order_value", "label": "Avg AOV ($)",   "type": "number"},
-            {"key": "total_revenue",   "label": "Revenue ($)",   "type": "number"},
+            {"key": "full_name",      "label": "Họ và tên",    "type": "string"},
+            {"key": "phong_ban",      "label": "Phòng ban",    "type": "string"},
+            {"key": "job_title",      "label": "Chức danh",    "type": "string"},
+            {"key": "join_date",      "label": "Ngày vào",     "type": "string"},
+            {"key": "tham_nien_nam",  "label": "Thâm niên (năm)", "type": "number"},
         ],
         "rows": [
-            {"segment": "Partner",    "total_orders": 26, "avg_order_value": 5188.46, "total_revenue": 134900.00},
-            {"segment": "Enterprise", "total_orders": 28, "avg_order_value": 4571.43, "total_revenue": 128000.00},
-            {"segment": "SMB",        "total_orders": 22, "avg_order_value": 2372.73, "total_revenue":  52200.00},
-            {"segment": "Startup",    "total_orders": 14, "avg_order_value":  897.14, "total_revenue":  12560.00},
-            {"segment": "Individual", "total_orders":  6, "avg_order_value":  487.00, "total_revenue":   2922.00},
+            {"full_name": "Nguyễn Văn Thành",  "phong_ban": "Kỹ thuật",   "job_title": "Trưởng nhóm kỹ thuật",    "join_date": "2021-06-01", "tham_nien_nam": 4.9},
+            {"full_name": "Trần Thị Ngọc",     "phong_ban": "Nhân sự",    "job_title": "Trưởng phòng nhân sự",    "join_date": "2021-08-15", "tham_nien_nam": 4.7},
+            {"full_name": "Lê Minh Khoa",      "phong_ban": "Kinh doanh", "job_title": "Giám đốc KD khu vực",     "join_date": "2021-09-03", "tham_nien_nam": 4.7},
+            {"full_name": "Phạm Thị Thu Hà",   "phong_ban": "Marketing",  "job_title": "Giám đốc marketing",      "join_date": "2021-11-20", "tham_nien_nam": 4.5},
+            {"full_name": "Hoàng Đức Long",    "phong_ban": "Kỹ thuật",   "job_title": "Kiến trúc sư hệ thống",   "join_date": "2022-01-10", "tham_nien_nam": 4.3},
         ],
         "chartType": "bar",
         "followUpQuestions": [
-            "Which individual customers have placed the most orders?",
-            "What is the AOV trend over the last 6 months?",
-            "How does discount usage impact average order value?",
+            "Phân bố thâm niên theo phòng ban?",
+            "Bao nhiêu nhân viên sắp tròn 5 năm công tác?",
+            "Tỉ lệ nghỉ việc theo nhóm thâm niên?",
         ],
     },
 ]
 
 # ---------------------------------------------------------------------------
-# Default fallback
+# Default fallback — HR overview
 # ---------------------------------------------------------------------------
 
 _DEFAULT_RESPONSE: dict = {
     "answer": (
-        "Based on the available business data, I can provide insights on revenue trends, "
-        "product performance, customer segments, campaign effectiveness, and lead pipeline. "
-        "Try asking something like: *'What are our top products by revenue?'* or "
-        "*'Show me monthly revenue for 2024.'*"
+        "Tôi có thể trả lời các câu hỏi HR như: headcount theo phòng ban, "
+        "sinh nhật nhân viên, phân tích lương, đơn nghỉ phép, đánh giá hiệu suất và thâm niên. "
+        "Thử hỏi: *'Tổng headcount theo phòng ban?'* hoặc *'Lương trung bình theo level?'*"
     ),
     "sql": """\
-SELECT
-  'customers'      AS table_name, COUNT(*) AS row_count FROM customers
+SELECT 'departments'        AS table_name, COUNT(*) AS row_count FROM departments
 UNION ALL
-SELECT 'products',    COUNT(*) FROM products
+SELECT 'employees',         COUNT(*) FROM employees WHERE deleted_at IS NULL
 UNION ALL
-SELECT 'orders',      COUNT(*) FROM orders
+SELECT 'payroll',           COUNT(*) FROM payroll WHERE deleted_at IS NULL
 UNION ALL
-SELECT 'leads',       COUNT(*) FROM leads
+SELECT 'attendance',        COUNT(*) FROM attendance WHERE deleted_at IS NULL
 UNION ALL
-SELECT 'campaigns',   COUNT(*) FROM campaigns;""",
+SELECT 'leave_requests',    COUNT(*) FROM leave_requests WHERE deleted_at IS NULL
+UNION ALL
+SELECT 'performance_reviews', COUNT(*) FROM performance_reviews WHERE deleted_at IS NULL;""",
     "columns": [
-        {"key": "table_name", "label": "Table",     "type": "string"},
-        {"key": "row_count",  "label": "Row Count", "type": "number"},
+        {"key": "table_name", "label": "Bảng",        "type": "string"},
+        {"key": "row_count",  "label": "Số bản ghi",  "type": "number"},
     ],
     "rows": [
-        {"table_name": "customers",  "row_count": 30},
-        {"table_name": "products",   "row_count": 15},
-        {"table_name": "orders",     "row_count": 96},
-        {"table_name": "leads",      "row_count": 60},
-        {"table_name": "campaigns",  "row_count": 10},
+        {"table_name": "departments",         "row_count":   4},
+        {"table_name": "employees",           "row_count": 150},
+        {"table_name": "payroll",             "row_count": 150},
+        {"table_name": "attendance",          "row_count": 3200},
+        {"table_name": "leave_requests",      "row_count": 200},
+        {"table_name": "performance_reviews", "row_count": 300},
     ],
     "chartType": "bar",
     "followUpQuestions": [
-        "What are the top 5 products by revenue?",
-        "Show me monthly revenue trends for 2024.",
-        "Which customer segment has the highest lifetime value?",
-        "How are our marketing campaigns performing?",
-        "What is our lead conversion rate by source?",
+        "Tổng headcount theo phòng ban?",
+        "Lương trung bình theo level?",
+        "Có bao nhiêu đơn nghỉ phép đang pending?",
+        "Điểm performance trung bình kỳ 2024-H2?",
+        "Top 10 nhân viên có thâm niên cao nhất?",
     ],
 }
 
