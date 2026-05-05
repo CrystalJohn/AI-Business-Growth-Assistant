@@ -6,7 +6,7 @@ from sqlalchemy import text
 
 from app.config import settings
 from app.db.session import async_engine
-from app.routes import health, schema_route, chat, sql_route
+from app.routes import health, schema_route, chat, sql_route, tools
 
 
 @asynccontextmanager
@@ -38,3 +38,4 @@ app.include_router(health.router)
 app.include_router(schema_route.router)
 app.include_router(chat.router, prefix="/chat", tags=["chat"])
 app.include_router(sql_route.router, prefix="/sql", tags=["sql"])
+app.include_router(tools.router)

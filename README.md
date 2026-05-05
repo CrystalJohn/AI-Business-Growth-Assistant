@@ -2,7 +2,7 @@
 
 A **secure AI ChatBI** application for HR Managers at Vietnamese SMB companies (~80–200 employees). Ask HR questions in plain language and receive answers, SQL queries, charts and tables — with PII masking and audit trail built in.
 
-> **Status**: Week 1 — Foundation. LLM is mocked. No paid API key required.  
+> **Status**: Week 3 — Tool Layer. 15 tools active. LLM is mocked.  
 > **Domain**: HR (nhân viên, lương, chấm công, nghỉ phép, đánh giá hiệu suất)
 
 ---
@@ -102,35 +102,48 @@ apps/api/
 ├── alembic/                   # DB migrations (source of truth)
 │   └── versions/
 │       ├── 001_initial_hr_schema.py   # 6 HR tables
-│       └── 002_views_and_audit.py     # audit_log + SQL views + role
+│       ├── 002_views_and_audit.py     # audit_log + SQL views + role
+│       ├── 003_extend_audit_log.py    # audit_log + 13 security columns
+│       └── 004_rls_policies.py        # RLS policies + GRANT
 ├── app/
 │   ├── config.py              # Settings (JWT, PII masking keys)
 │   ├── db/
 │   │   ├── base.py            # Base, AuditMixin, SoftDeleteMixin
-│   │   ├── session.py         # async_engine, get_db() dependency
+│   │   ├── session.py         # async_engine, get_db(), get_db_with_rls()
 │   │   └── models/            # 7 SQLAlchemy ORM models
-│   ├── repositories/          # Repository Pattern (BaseRepository[T])
+│   ├── dependencies/          # FastAPI dependencies
+│   │   └── mock_user.py       # Mock user (Week 6 → JWT)
+│   ├── middleware/
+│   │   └── db_context.py      # set_rls_context() — SET LOCAL vars
+│   ├── repositories/          # Repository Pattern
+│   │   ├── base.py            # BaseRepository[T]
+│   │   ├── employee_repo.py   # EmployeeRepository
+│   │   └── audit_repo.py      # AuditRepository.log_query()
 │   ├── schemas/               # Pydantic DTOs (query, employee)
 │   ├── routes/                # FastAPI routers
-│   └── services/              # Business logic + LLM mock
+│   │   ├── health.py
+│   │   ├── chat.py
+│   │   ├── tools.py           # GET /tools, POST /tools/{name}
+│   │   ├── schema_route.py
+│   │   └── sql_route.py
+│   ├── services/              # Business logic + LLM mock
+│   │   └── audit_decorator.py # @audited decorator
+│   └── tools/                 # 15 tool catalog
+│       ├── base.py            # ToolBase, ToolResult
+│       ├── registry.py        # REGISTRY dict
+│       └── *.py               # 15 tool implementations
 ├── scripts/
 │   ├── seed_data.py           # Idempotent seed entry point
 │   └── factories/             # Faker vi_VN factories
 ├── tests/
 │   ├── conftest.py            # Test DB fixtures
-│   └── test_models.py         # Schema smoke tests
+│   ├── test_models.py         # Schema smoke tests
+│   ├── test_rls.py            # RLS policy tests (8 tests)
+│   ├── test_audit_repo.py     # AuditRepository tests (4 tests)
+│   └── test_tools/            # Tool layer tests
+│       ├── test_tool_registry.py    # Registry + RBAC tests (10 tests)
+│       └── test_tool_integration.py # Integration tests (8 tests)
 └── requirements.txt
-database/
-├── schema.sql                 # Legacy reference — Alembic is now source of truth
-└── seeds/seed.sql             # Legacy reference — replaced by scripts/seed_data.py
-docs/
-├── adr/                       # Architecture Decision Records
-│   ├── ADR-001-choose-alembic.md
-│   ├── ADR-002-layered-architecture.md
-│   └── ADR-003-soft-delete-audit.md
-├── erd.md                     # HR domain ERD (7 tables, Mermaid)
-├── flowchart.md               # 5-layer security architecture flow
-└── 03-week1-dev-log.md        # Week 1 retrospective + DoD checklist
 ```
 
 ---
@@ -151,6 +164,41 @@ docs/
 - `v_employee_safe` — masks `citizen_id`
 - `v_payroll_anonymized` — replaces salary with band labels
 - `hr_chatbi_readonly` — Postgres role with SELECT-only on views
+
+---
+
+## Security Layers (Implemented)
+
+| Layer | Status | Notes |
+|---|---|---|
+| L1 — Auth | 🟡 Mock | `get_mock_user()` → JWT real Week 6 |
+| L2 — LLM Router | 🔴 Not started | Week 4 |
+| L3 — Tool Layer | 🔴 Not started | Week 3 |
+| L3b — SQL Validator | 🔴 Not started | Week 5 |
+| L4 — RLS + Postgres | ✅ Done | 6 tables, 17 policies, `SET LOCAL` context |
+| L5 — Audit | ✅ Done | `AuditRepository.log_query()`, append-only |
+
+**RLS Policy Summary:**
+- `employees`: HR_Manager sees all, HR_Staff sees own dept only
+- `payroll`: HR_Manager only (HR_Staff blocked completely)
+- `attendance`, `leave_requests`, `performance_reviews`: Manager all, Staff same dept
+- Default deny: unknown role → 0 rows on all tables
+
+---
+
+## Tool Catalog (15 tools)
+
+| Cluster | Tool | RBAC |
+|---|---|---|
+| Headcount | `get_headcount_by_department`, `get_age_distribution`, `get_gender_distribution` | Any |
+| Search | `search_employees`, `get_employee_detail`, `list_tenure_top_n` | RLS-filtered |
+| Compensation | `get_avg_salary_by_level`, `get_payroll_summary_by_month` | Manager only |
+| Leave/Attend | `get_leave_balance`, `list_leaves_expiring_year_end`, `get_attendance_summary` | RLS-filtered |
+| Performance | `list_pending_performance_reviews`, `list_birthdays_this_month` | RLS-filtered |
+| Trends | `get_turnover_rate`, `list_contracts_expiring_soon` | Manager only |
+
+Explore: `GET /tools` returns full catalog with Pydantic JSON Schema.  
+Execute: `POST /tools/{name}` with JSON body matching input schema.
 
 ---
 
