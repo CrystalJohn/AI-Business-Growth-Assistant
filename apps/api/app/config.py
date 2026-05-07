@@ -13,6 +13,11 @@ class Settings(BaseSettings):
 
     pii_masking_key: str = "change-me-masking-key"
 
+    gemini_api_key: str = ""
+    groq_api_key: str = ""
+    llm_timeout_seconds: int = 10
+    llm_cache_ttl_seconds: int = 3600
+
     model_config = SettingsConfigDict(
         env_file=".env", extra="ignore", env_aliases={"cors_origins_raw": "CORS_ORIGINS"}
     )

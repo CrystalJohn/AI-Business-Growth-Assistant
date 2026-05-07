@@ -1,16 +1,9 @@
-export interface TableColumn {
-  key: string
-  label: string
-  type: "string" | "number" | "date"
-}
-
 export interface QueryResponse {
   answer: string
-  sql: string
-  columns: TableColumn[]
-  rows: Record<string, unknown>[]
-  chartType?: "bar" | "line" | "pie" | "area" | null
-  followUpQuestions: string[]
+  data: Record<string, unknown>[] | Record<string, unknown>
+  rows: number
+  tool: string | null
+  chart_type?: "bar" | "line" | "pie" | "area" | null
 }
 
 export interface ChatMessage {

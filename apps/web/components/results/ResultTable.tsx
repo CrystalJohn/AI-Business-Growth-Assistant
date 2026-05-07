@@ -12,7 +12,12 @@ import {
 import { useState } from "react"
 import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import type { TableColumn } from "@/types"
+
+interface TableColumn {
+  key: string
+  label: string
+  type: "string" | "number" | "date"
+}
 
 interface Props {
   columns: TableColumn[]

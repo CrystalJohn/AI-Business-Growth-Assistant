@@ -2,7 +2,7 @@
 
 A **secure AI ChatBI** application for HR Managers at Vietnamese SMB companies (~80–200 employees). Ask HR questions in plain language and receive answers, SQL queries, charts and tables — with PII masking and audit trail built in.
 
-> **Status**: Week 3 — Tool Layer. 15 tools active. LLM is mocked.  
+> **Status**: Week 4 — LLM Integration. Gemini/Groq/Mock active.  
 > **Domain**: HR (nhân viên, lương, chấm công, nghỉ phép, đánh giá hiệu suất)
 
 ---
@@ -18,7 +18,7 @@ A **secure AI ChatBI** application for HR Managers at Vietnamese SMB companies (
 | Database | PostgreSQL 16 |
 | Seed Data | Faker `vi_VN` — 150 Vietnamese employees |
 | SQL Validation | sqlglot |
-| LLM | Mock provider → Gemini Flash / Groq (pluggable, Week 3+) |
+| LLM | Gemini Flash 2.5 (primary) / Groq llama-3.3-70b (fallback) / Mock (default) |
 
 ---
 
@@ -127,7 +127,16 @@ apps/api/
 │   │   ├── schema_route.py
 │   │   └── sql_route.py
 │   ├── services/              # Business logic + LLM mock
-│   │   └── audit_decorator.py # @audited decorator
+│   │   ├── audit_decorator.py # @audited decorator
+│   │   ├── llm_router.py      # LLM orchestration
+│   │   ├── response_cache.py  # TTLCache
+│   │   └── llm/               # LLM providers
+│   │       ├── base.py        # LLMProvider interface
+│   │       ├── mock_provider.py
+│   │       ├── gemini_provider.py
+│   │       ├── groq_provider.py
+│   │       ├── factory.py     # get_provider()
+│   │       └── prompts.py     # System prompt VN
 │   └── tools/                 # 15 tool catalog
 │       ├── base.py            # ToolBase, ToolResult
 │       ├── registry.py        # REGISTRY dict
@@ -143,6 +152,11 @@ apps/api/
 │   └── test_tools/            # Tool layer tests
 │       ├── test_tool_registry.py    # Registry + RBAC tests (10 tests)
 │       └── test_tool_integration.py # Integration tests (8 tests)
+│   └── test_llm/              # LLM integration tests
+│       ├── test_provider_mock.py
+│       ├── test_router_dispatch.py
+│       ├── test_router_rbac.py
+│       └── test_cache.py
 └── requirements.txt
 ```
 
@@ -172,8 +186,8 @@ apps/api/
 | Layer | Status | Notes |
 |---|---|---|
 | L1 — Auth | 🟡 Mock | `get_mock_user()` → JWT real Week 6 |
-| L2 — LLM Router | 🔴 Not started | Week 4 |
-| L3 — Tool Layer | 🔴 Not started | Week 3 |
+| L2 — LLM Router | ✅ Done | Gemini/Groq/Mock adapter, function calling |
+| L3 — Tool Layer | ✅ Done | 15 tools, Pydantic schema, RBAC |
 | L3b — SQL Validator | 🔴 Not started | Week 5 |
 | L4 — RLS + Postgres | ✅ Done | 6 tables, 17 policies, `SET LOCAL` context |
 | L5 — Audit | ✅ Done | `AuditRepository.log_query()`, append-only |
@@ -199,6 +213,39 @@ apps/api/
 
 Explore: `GET /tools` returns full catalog with Pydantic JSON Schema.  
 Execute: `POST /tools/{name}` with JSON body matching input schema.
+
+---
+
+## LLM Setup
+
+### 1. Lấy API key (miễn phí, 1 phút)
+
+- **Gemini** (primary): https://aistudio.google.com/apikey
+- **Groq** (fallback): https://console.groq.com/keys
+
+### 2. Cấu hình `.env`
+
+```bash
+LLM_PROVIDER=gemini         # gemini | groq | mock
+GEMINI_API_KEY=your_key     # từ bước 1
+GROQ_API_KEY=your_key       # optional, dùng khi Gemini quota cạn
+```
+
+### 3. Restart
+
+```bash
+docker-compose restart api
+```
+
+### 4. Test
+
+```bash
+curl -X POST http://localhost:8000/chat/query \
+  -H "Content-Type: application/json" \
+  -d '{"question":"Headcount theo phòng ban?"}'
+```
+
+Mock provider hoạt động không cần API key (keyword matching).
 
 ---
 

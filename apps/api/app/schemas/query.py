@@ -16,11 +16,10 @@ class QueryRequest(BaseModel):
 
 class QueryResponse(BaseModel):
     answer: str
-    sql: str
-    columns: List[TableColumn]
-    rows: List[Dict[str, Any]]
-    chartType: Optional[str] = None
-    followUpQuestions: List[str] = []
+    data: List[Dict[str, Any]] | Dict[str, Any] = []
+    rows: int = 0
+    tool: Optional[str] = None
+    chart_type: Optional[str] = None
 
 
 class ValidateRequest(BaseModel):

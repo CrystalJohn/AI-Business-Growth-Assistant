@@ -17,7 +17,12 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts"
-import type { TableColumn } from "@/types"
+
+interface TableColumn {
+  key: string
+  label: string
+  type: "string" | "number" | "date"
+}
 
 const COLORS = [
   "#3b82f6", "#10b981", "#f59e0b", "#ef4444",
