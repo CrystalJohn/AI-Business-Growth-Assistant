@@ -1,5 +1,42 @@
 from app.services.llm.base import LLMProvider, LLMResponse, ToolCall
 
+_SQL_TEMPLATES: list[dict] = [
+    {
+        "keywords": ["vào làm", "join_date", "tháng", "năm"],
+        "sql": (
+            "SELECT full_name, job_title, join_date, department_name "
+            "FROM v_employee_safe "
+            "WHERE join_date >= '2023-01-01' "
+            "ORDER BY join_date DESC LIMIT 50"
+        ),
+    },
+    {
+        "keywords": ["nghỉ phép", "leave", "ngày nghỉ", "tháng"],
+        "sql": (
+            "SELECT full_name, department_name, leave_type, total_days, status "
+            "FROM v_leave_overview "
+            "WHERE status = 'approved' "
+            "ORDER BY start_date DESC LIMIT 50"
+        ),
+    },
+    {
+        "keywords": ["chấm công", "attendance", "vắng mặt", "đi trễ"],
+        "sql": (
+            "SELECT full_name, department_name, work_date, status "
+            "FROM v_attendance_daily "
+            "ORDER BY work_date DESC LIMIT 50"
+        ),
+    },
+    {
+        "keywords": ["đánh giá", "performance", "điểm", "rating"],
+        "sql": (
+            "SELECT full_name, department_name, period, score, rating "
+            "FROM v_performance_summary "
+            "ORDER BY score DESC LIMIT 50"
+        ),
+    },
+]
+
 KEYWORD_MAP: dict[str, list[str]] = {
     "get_headcount_by_department": ["headcount", "nhân viên", "phòng ban", "department", "bao nhiêu người", "số lượng"],
     "list_birthdays_this_month": ["sinh nhật", "birthday", "tháng này"],
@@ -41,6 +78,21 @@ class MockProvider(LLMProvider):
             tool_call=None,
             raw_text="Em chưa hiểu câu hỏi này. Thử hỏi: 'Headcount theo phòng ban?' hoặc 'Lương trung bình theo level?'",
             finish_reason="no_match",
+        )
+
+    async def generate_sql(
+        self,
+        question: str,
+        view_schema: str,
+    ) -> str | None:
+        q = question.lower()
+        for template in _SQL_TEMPLATES:
+            if any(kw in q for kw in template["keywords"]):
+                return template["sql"]
+        return (
+            "SELECT full_name, job_title, department_name, join_date "
+            "FROM v_employee_safe "
+            "ORDER BY full_name LIMIT 50"
         )
 
     async def summarize(

@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies.mock_user import MockUser
+from app.auth.schemas import CurrentUser
 from app.tools.base import ToolBase, ToolResult
 
 
@@ -25,7 +25,7 @@ class GetTurnoverRateTool(ToolBase):
     required_role = "HR_Manager"
 
     async def execute(
-        self, session: AsyncSession, user: MockUser, args: TurnoverRateInput
+        self, session: AsyncSession, user: CurrentUser, args: TurnoverRateInput
     ) -> ToolResult:
         result = await session.execute(text("""
             WITH leavers AS (

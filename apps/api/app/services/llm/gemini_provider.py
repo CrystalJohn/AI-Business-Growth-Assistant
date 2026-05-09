@@ -6,6 +6,7 @@ from typing import Any
 
 from app.config import settings
 from app.services.llm.base import LLMProvider, LLMResponse, ToolCall
+from app.services.llm.prompts import SQL_GENERATION_PROMPT, VIEW_SCHEMA_DDL
 
 logger = logging.getLogger(__name__)
 
@@ -75,14 +76,35 @@ class GeminiFlashProvider(LLMProvider):
         max_words: int = 100,
     ) -> str:
         try:
+            summary_data = data[:10]
             prompt = (
                 f"Tóm tắt kết quả này thành 1-2 câu tiếng Việt cho HR. "
-                f"Câu hỏi: {question}\nDữ liệu: {json.dumps(data, ensure_ascii=False)[:500]}"
+                f"Câu hỏi: {question}\n"
+                f"Dữ liệu ({len(data)} dòng, hiển thị {len(summary_data)} dòng đầu): "
+                f"{json.dumps(summary_data, ensure_ascii=False)}"
             )
             response = await self.model.generate_content_async(prompt)
             return response.text
         except Exception:
             return f"Tìm thấy {len(data)} kết quả."
+
+    async def generate_sql(
+        self,
+        question: str,
+        view_schema: str,
+    ) -> str | None:
+        try:
+            prompt = SQL_GENERATION_PROMPT.format(
+                view_schema=view_schema,
+                question=question,
+            )
+            response = await self.model.generate_content_async(prompt)
+            raw = response.text.strip()
+            raw = raw.removeprefix("```sql").removeprefix("```").removesuffix("```").strip()
+            return raw or None
+        except Exception as e:
+            logger.error("Gemini generate_sql error: %s", e)
+            return None
 
     def _json_schema_to_proto(self, schema: dict[str, Any]) -> dict[str, Any]:
         """Convert Pydantic JSON Schema → Gemini Schema proto format."""

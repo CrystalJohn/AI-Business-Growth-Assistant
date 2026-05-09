@@ -5,6 +5,7 @@ from .attendance import Attendance
 from .leave_request import LeaveRequest
 from .performance_review import PerformanceReview
 from .audit_log import AuditLog
+from .app_user import AppUser
 
 __all__ = [
     "Department",
@@ -14,4 +15,5 @@ __all__ = [
     "LeaveRequest",
     "PerformanceReview",
     "AuditLog",
+    "AppUser",
 ]

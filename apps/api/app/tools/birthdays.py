@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies.mock_user import MockUser
+from app.auth.schemas import CurrentUser
 from app.tools.base import ToolBase, ToolResult
 
 
@@ -26,7 +26,7 @@ class ListBirthdaysThisMonthTool(ToolBase):
     required_role = None
 
     async def execute(
-        self, session: AsyncSession, user: MockUser, args: BirthdaysInput
+        self, session: AsyncSession, user: CurrentUser, args: BirthdaysInput
     ) -> ToolResult:
         result = await session.execute(text("""
             SELECT e.id, e.full_name, d.name, e.birth_date::text

@@ -6,7 +6,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.tools.registry import get_tool
-from app.dependencies.mock_user import MockUser
+from app.auth.schemas import CurrentUser
 from app.middleware.db_context import set_rls_context
 
 TEST_DATABASE_URL = os.getenv(
@@ -34,8 +34,8 @@ async def staff_session():
         await session.rollback()
 
 
-MANAGER = MockUser(user_id=1, role="HR_Manager", dept_id=1)
-STAFF = MockUser(user_id=2, role="HR_Staff", dept_id=1)
+MANAGER = CurrentUser(user_id=1, username="hr_manager", role="HR_Manager", dept_id=1)
+STAFF = CurrentUser(user_id=2, username="hr_staff", role="HR_Staff", dept_id=1)
 
 
 @pytest.mark.asyncio

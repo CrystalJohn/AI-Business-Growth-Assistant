@@ -2,7 +2,7 @@
 
 A **secure AI ChatBI** application for HR Managers at Vietnamese SMB companies (~80–200 employees). Ask HR questions in plain language and receive answers, SQL queries, charts and tables — with PII masking and audit trail built in.
 
-> **Status**: Week 4 — LLM Integration. Gemini/Groq/Mock active.  
+> **Status**: Week 6 — JWT Auth + RBAC + PII Masking active.  
 > **Domain**: HR (nhân viên, lương, chấm công, nghỉ phép, đánh giá hiệu suất)
 
 ---
@@ -104,8 +104,14 @@ apps/api/
 │       ├── 001_initial_hr_schema.py   # 6 HR tables
 │       ├── 002_views_and_audit.py     # audit_log + SQL views + role
 │       ├── 003_extend_audit_log.py    # audit_log + 13 security columns
-│       └── 004_rls_policies.py        # RLS policies + GRANT
+│       ├── 004_rls_policies.py        # RLS policies + GRANT
+│       └── 005_t2sql_views.py         # 4 additional views for T2SQL fallback
 ├── app/
+│   ├── auth/                  # JWT auth
+│   │   ├── security.py        # bcrypt hash + verify
+│   │   ├── jwt.py             # create/decode token
+│   │   ├── dependencies.py    # get_current_user()
+│   │   └── schemas.py         # LoginRequest, TokenResponse, CurrentUser
 │   ├── config.py              # Settings (JWT, PII masking keys)
 │   ├── db/
 │   │   ├── base.py            # Base, AuditMixin, SoftDeleteMixin
@@ -128,15 +134,16 @@ apps/api/
 │   │   └── sql_route.py
 │   ├── services/              # Business logic + LLM mock
 │   │   ├── audit_decorator.py # @audited decorator
-│   │   ├── llm_router.py      # LLM orchestration
+│   │   ├── llm_router.py      # LLM orchestration + SQL fallback
+│   │   ├── sql_validator.py   # sqlglot AST validator (Week 5)
 │   │   ├── response_cache.py  # TTLCache
 │   │   └── llm/               # LLM providers
-│   │       ├── base.py        # LLMProvider interface
+│   │       ├── base.py        # LLMProvider interface (+ generate_sql)
 │   │       ├── mock_provider.py
 │   │       ├── gemini_provider.py
 │   │       ├── groq_provider.py
 │   │       ├── factory.py     # get_provider()
-│   │       └── prompts.py     # System prompt VN
+│   │       └── prompts.py     # System prompt + SQL_GENERATION_PROMPT
 │   └── tools/                 # 15 tool catalog
 │       ├── base.py            # ToolBase, ToolResult
 │       ├── registry.py        # REGISTRY dict
@@ -152,11 +159,14 @@ apps/api/
 │   └── test_tools/            # Tool layer tests
 │       ├── test_tool_registry.py    # Registry + RBAC tests (10 tests)
 │       └── test_tool_integration.py # Integration tests (8 tests)
+│   ├── test_sql_validator.py  # 21 validator unit tests (Week 5)
 │   └── test_llm/              # LLM integration tests
 │       ├── test_provider_mock.py
 │       ├── test_router_dispatch.py
 │       ├── test_router_rbac.py
 │       └── test_cache.py
+│   └── test_auth/             # Auth + RBAC + PII tests
+│       └── test_auth_rbac_pii.py
 └── requirements.txt
 ```
 
@@ -174,10 +184,14 @@ apps/api/
 | `performance_reviews` | Đánh giá hiệu suất theo kỳ | Medium |
 | `audit_log` | Ghi mọi LLM query + action | Internal |
 
-**SQL Views (security skeleton):**
+**SQL Views (T2SQL whitelist — 6 allowed views):**
 - `v_employee_safe` — masks `citizen_id`
 - `v_payroll_anonymized` — replaces salary with band labels
-- `hr_chatbi_readonly` — Postgres role with SELECT-only on views
+- `v_attendance_daily` — chấm công + employee + department (Week 5)
+- `v_leave_overview` — đơn nghỉ phép + computed total_days (Week 5)
+- `v_performance_summary` — đánh giá hiệu suất + department (Week 5)
+- `v_department_list` — danh sách phòng ban (Week 5)
+- `hr_chatbi_readonly` — Postgres role with SELECT-only on all views
 
 ---
 
@@ -185,10 +199,10 @@ apps/api/
 
 | Layer | Status | Notes |
 |---|---|---|
-| L1 — Auth | 🟡 Mock | `get_mock_user()` → JWT real Week 6 |
+| L1 — Auth | ✅ Done | JWT + bcrypt + role hierarchy |
 | L2 — LLM Router | ✅ Done | Gemini/Groq/Mock adapter, function calling |
 | L3 — Tool Layer | ✅ Done | 15 tools, Pydantic schema, RBAC |
-| L3b — SQL Validator | 🔴 Not started | Week 5 |
+| L3b — Constrained T2SQL | ✅ Done | sqlglot AST, view whitelist, LIMIT cap, SQL fallback path |
 | L4 — RLS + Postgres | ✅ Done | 6 tables, 17 policies, `SET LOCAL` context |
 | L5 — Audit | ✅ Done | `AuditRepository.log_query()`, append-only |
 
@@ -246,6 +260,30 @@ curl -X POST http://localhost:8000/chat/query \
 ```
 
 Mock provider hoạt động không cần API key (keyword matching).
+
+---
+
+## Demo Accounts
+
+| Username | Password | Role | Access |
+|---|---|---|---|
+| hr_manager | manager123 | HR_Manager | Full access, salary visible |
+| hr_staff | staff123 | HR_Staff | HR data, salary masked |
+| dept_manager | dept123 | Dept_Manager | Own dept, salary masked |
+| viewer | viewer123 | Viewer | Read-only, PII masked |
+
+```bash
+# Login
+curl -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"hr_manager","password":"manager123"}'
+# Returns: {"access_token": "eyJ...", "token_type": "bearer"}
+
+# Use token
+curl -H "Authorization: Bearer <token>" http://localhost:8000/chat/query \
+  -H "Content-Type: application/json" \
+  -d '{"question":"Headcount theo phòng ban?"}'
+```
 
 ---
 

@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies.mock_user import MockUser
+from app.auth.schemas import CurrentUser
 from app.tools.base import ToolBase, ToolResult
 
 
@@ -27,7 +27,7 @@ class SearchEmployeesTool(ToolBase):
     required_role = None
 
     async def execute(
-        self, session: AsyncSession, user: MockUser, args: SearchEmployeesInput
+        self, session: AsyncSession, user: CurrentUser, args: SearchEmployeesInput
     ) -> ToolResult:
         result = await session.execute(text("""
             SELECT e.id, e.full_name, d.name, e.job_title, e.join_date::text

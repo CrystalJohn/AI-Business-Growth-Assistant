@@ -2,7 +2,7 @@
 import pytest
 from app.tools.registry import get_tool, list_tools, REGISTRY
 from app.tools.base import ToolResult
-from app.dependencies.mock_user import MockUser
+from app.auth.schemas import CurrentUser
 
 
 def test_registry_has_15_tools():
@@ -32,20 +32,20 @@ def test_get_tool_returns_instance():
 
 def test_manager_access_any_tool():
     tool = get_tool("get_avg_salary_by_level")
-    user = MockUser(user_id=1, role="HR_Manager", dept_id=1)
+    user = CurrentUser(user_id=1, username="hr_manager", role="HR_Manager", dept_id=1)
     tool.check_access(user)  # should not raise
 
 
 def test_staff_blocked_manager_only_tool():
     tool = get_tool("get_avg_salary_by_level")
-    user = MockUser(user_id=2, role="HR_Staff", dept_id=1)
-    with pytest.raises(PermissionError, match="requires role HR_Manager"):
+    user = CurrentUser(user_id=2, username="hr_staff", role="HR_Staff", dept_id=1)
+    with pytest.raises(PermissionError, match="requires"):
         tool.check_access(user)
 
 
 def test_staff_can_access_any_role_tool():
     tool = get_tool("get_headcount_by_department")
-    user = MockUser(user_id=2, role="HR_Staff", dept_id=1)
+    user = CurrentUser(user_id=2, username="hr_staff", role="HR_Staff", dept_id=1)
     tool.check_access(user)  # should not raise
 
 

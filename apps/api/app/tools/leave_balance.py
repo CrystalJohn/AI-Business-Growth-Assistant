@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies.mock_user import MockUser
+from app.auth.schemas import CurrentUser
 from app.tools.base import ToolBase, ToolResult
 
 
@@ -26,7 +26,7 @@ class GetLeaveBalanceTool(ToolBase):
     required_role = None
 
     async def execute(
-        self, session: AsyncSession, user: MockUser, args: LeaveBalanceInput
+        self, session: AsyncSession, user: CurrentUser, args: LeaveBalanceInput
     ) -> ToolResult:
         result = await session.execute(text("""
             SELECT

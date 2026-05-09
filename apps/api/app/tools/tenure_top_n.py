@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies.mock_user import MockUser
+from app.auth.schemas import CurrentUser
 from app.tools.base import ToolBase, ToolResult
 
 
@@ -24,7 +24,7 @@ class ListTenureTopNTool(ToolBase):
     required_role = None
 
     async def execute(
-        self, session: AsyncSession, user: MockUser, args: TenureTopNInput
+        self, session: AsyncSession, user: CurrentUser, args: TenureTopNInput
     ) -> ToolResult:
         result = await session.execute(text("""
             SELECT e.full_name, d.name,

@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies.mock_user import MockUser
+from app.auth.schemas import CurrentUser
 from app.tools.base import ToolBase, ToolResult
 
 
@@ -25,7 +25,7 @@ class GetPayrollSummaryByMonthTool(ToolBase):
     required_role = "HR_Manager"
 
     async def execute(
-        self, session: AsyncSession, user: MockUser, args: PayrollSummaryInput
+        self, session: AsyncSession, user: CurrentUser, args: PayrollSummaryInput
     ) -> ToolResult:
         result = await session.execute(text("""
             SELECT d.name AS dept,

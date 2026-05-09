@@ -5,6 +5,7 @@ import logging
 
 from app.config import settings
 from app.services.llm.base import LLMProvider, LLMResponse, ToolCall
+from app.services.llm.prompts import SQL_GENERATION_PROMPT, VIEW_SCHEMA_DDL
 
 logger = logging.getLogger(__name__)
 
@@ -81,14 +82,38 @@ class GroqProvider(LLMProvider):
         max_words: int = 100,
     ) -> str:
         try:
+            summary_data = data[:10]
             prompt = (
                 f"Tóm tắt kết quả này thành 1-2 câu tiếng Việt cho HR. "
-                f"Câu hỏi: {question}\nDữ liệu: {json.dumps(data, ensure_ascii=False)[:500]}"
+                f"Câu hỏi: {question}\n"
+                f"Dữ liệu ({len(data)} dòng, hiển thị {len(summary_data)} dòng đầu): "
+                f"{json.dumps(summary_data, ensure_ascii=False)}"
             )
             response = await self.client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[{"role": "user", "content": prompt}],
             )
-            return response.choices[0].content or f"Tìm thấy {len(data)} kết quả."
+            return response.choices[0].message.content or f"Tìm thấy {len(data)} kết quả."
         except Exception:
             return f"Tìm thấy {len(data)} kết quả."
+
+    async def generate_sql(
+        self,
+        question: str,
+        view_schema: str,
+    ) -> str | None:
+        try:
+            prompt = SQL_GENERATION_PROMPT.format(
+                view_schema=view_schema,
+                question=question,
+            )
+            response = await self.client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = (response.choices[0].message.content or "").strip()
+            raw = raw.removeprefix("```sql").removeprefix("```").removesuffix("```").strip()
+            return raw or None
+        except Exception as e:
+            logger.error("Groq generate_sql error: %s", e)
+            return None

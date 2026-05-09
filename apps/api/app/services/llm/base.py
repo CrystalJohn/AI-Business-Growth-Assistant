@@ -38,3 +38,15 @@ class LLMProvider(ABC):
     ) -> str:
         """Sinh text answer ngắn từ kết quả query."""
         ...
+
+    @abstractmethod
+    async def generate_sql(
+        self,
+        question: str,
+        view_schema: str,
+    ) -> str | None:
+        """Sinh SQL SELECT dựa trên câu hỏi và schema views cho phép.
+
+        Trả về raw SQL string hoặc None nếu không thể sinh.
+        """
+        ...

@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies.mock_user import MockUser
+from app.auth.schemas import CurrentUser
 from app.tools.base import ToolBase, ToolResult
 
 
@@ -32,7 +32,7 @@ class GetEmployeeDetailTool(ToolBase):
     required_role = None
 
     async def execute(
-        self, session: AsyncSession, user: MockUser, args: EmployeeDetailInput
+        self, session: AsyncSession, user: CurrentUser, args: EmployeeDetailInput
     ) -> ToolResult:
         result = await session.execute(text("""
             SELECT e.id, e.employee_code, e.full_name, e.email, e.phone,
