@@ -3,10 +3,12 @@ import time
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.dependencies import get_current_user
+from app.auth.schemas import CurrentUser
 from app.db.session import get_db
-from app.dependencies.mock_user import MockUser, get_mock_user
 from app.middleware.db_context import set_rls_context
 from app.repositories.audit_repo import AuditRepository
+from app.services.pii_masking import mask_response_data
 from app.tools.registry import get_tool, list_tools
 
 router = APIRouter(prefix="/tools", tags=["tools"])
@@ -21,7 +23,7 @@ async def list_all_tools():
 async def execute_tool(
     tool_name: str,
     args: dict,
-    user: MockUser = Depends(get_mock_user),
+    user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     try:
@@ -46,11 +48,13 @@ async def execute_tool(
     result = None
     try:
         result = await tool.execute(db, user, validated_args)
+        masked_data, mask_applied = mask_response_data(result.data, user.role)
         return {
             "tool": tool_name,
-            "data": result.data,
+            "data": masked_data,
             "rows_returned": result.rows_returned,
             "chart_type": result.chart_type,
+            "mask_applied": mask_applied,
         }
     except PermissionError as e:
         status, blocked_reason = "blocked", str(e)

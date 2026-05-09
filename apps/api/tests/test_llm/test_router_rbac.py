@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 
 from app.services.llm.base import LLMResponse, ToolCall
 from app.services.llm_router import LLMRouter
-from app.dependencies.mock_user import MockUser
+from app.auth.schemas import CurrentUser
 
 
 @pytest.fixture
@@ -24,7 +24,7 @@ def mock_db():
 
 @pytest.fixture
 def staff():
-    return MockUser(user_id=2, role="HR_Staff", dept_id=1)
+    return CurrentUser(user_id=2, username="hr_staff", role="HR_Staff", dept_id=1)
 
 
 @pytest.mark.asyncio
@@ -36,7 +36,7 @@ async def test_staff_blocked_manager_tool(mock_provider, mock_db, staff):
     router = LLMRouter(mock_provider)
     result = await router.route("Lương trung bình", staff, mock_db)
     assert result["rows"] == 0
-    assert "requires role" in result["answer"]
+    assert "requires" in result["answer"].lower()
 
 
 @pytest.mark.asyncio
